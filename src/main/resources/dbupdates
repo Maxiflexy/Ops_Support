@@ -1,0 +1,19 @@
+alter table esbuser.bck_users add app_code varchar2(20);
+alter table esbuser.bck_roles add app_code varchar2(20);
+alter table esbuser.bck_permissions add app_code varchar2(20);
+alter table esbuser.switch_resources add app_code varchar2(20);
+alter table esbuser.switch_permission_resources add app_code varchar2(20);
+alter table esbuser.bck_role_permission add app_code varchar2(20);
+
+
+update esbuser.bck_users set app_code = 'SUPPORT' where app_code is null;
+update esbuser.bck_roles set app_code = 'SUPPORT' where app_code is null;
+update esbuser.bck_permissions set app_code = 'SUPPORT' where app_code is null;
+update esbuser.switch_resources set app_code = 'SUPPORT' where app_code is null;
+update esbuser.switch_permission_resources set app_code = 'SUPPORT' where app_code is null;
+update esbuser.bck_role_permission set app_code = 'SUPPORT' where app_code is null;
+
+
+ALTER TABLE esbuser.BCK_USERS ADD username varchar2(40);
+
+UPDATE esbuser.BCK_USERS SET USERNAME = EMAIL ;

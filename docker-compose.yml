@@ -1,0 +1,17 @@
+services:
+  operation-support-app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - "8081:9897"
+    container_name: operation-support-service
+    # environment:
+    #   - JAVA_OPTS=-Xmx512m -Xms256m
+    volumes:
+      - ./logs:/app/logs
+      - ./src/main/resources/service.keystore.jks:/app/service.keystore.jks
+      - ./src/main/resources/startup.cfg:/app/startup.cfg
+      - ./src/main/resources/System.properties:/app/System.properties
+      - ./src/main/resources/log4j2.xml:/app/log4j2.xml
+    restart: unless-stopped

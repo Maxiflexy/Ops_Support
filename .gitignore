@@ -1,0 +1,9 @@
+/target/
+/-
+/Certificate.pem
+/*.csv*
+/.idea
+Failed transaction file.xlsx
+found_references.xlsx
+not_found_references.xlsx
+Airtime-Transaction-Error.xlsx

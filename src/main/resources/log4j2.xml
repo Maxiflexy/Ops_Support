@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration status="info">
+    <Properties>
+        <Property name="logdir">../logs</Property>
+        <Property name="layout">%d [%t] %c- %m%n</Property>
+    </Properties>
+    <Appenders>
+        <RollingFile name="supportinfo"
+                     fileName="${logdir}/support-api-info.log"
+                     filePattern="${logdir}/support-api-info.%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="${layout}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy />
+                <SizeBasedTriggeringPolicy size="1 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10" />
+        </RollingFile>
+        <RollingFile name="supporterror"
+                     fileName="${logdir}/support-api-error.log"
+                     filePattern="${logdir}/support-api-error.%d{yyyy-MM-dd}-%i.log">
+
+
+            <PatternLayout pattern="${layout}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy />
+                <SizeBasedTriggeringPolicy size="1 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10" />
+        </RollingFile>
+        <RollingFile name="supportfatal"
+                     fileName="${logdir}/support-api-fatal.log"
+                     filePattern="${logdir}/support-api-fatal.%d{yyyy-MM-dd}-%i.log">
+
+            <PatternLayout pattern="${layout}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy />
+                <SizeBasedTriggeringPolicy size="1 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10" />
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Logger name="start" level="debug" additivity="false">
+            <AppenderRef ref="supportinfo" />
+        </Logger>
+        <Logger name="messaging" level="debug" additivity="false">
+            <AppenderRef ref="supportinfo" />
+        </Logger>
+        <Logger name="persistence" level="debug" additivity="false">
+            <AppenderRef ref="supportinfo" />
+        </Logger>
+        <Logger name="util" level="debug" additivity="false">
+            <AppenderRef ref="supportinfo" />
+        </Logger>
+        <Logger name="services" level="debug" additivity="false">
+            <AppenderRef ref="supportinfo" />
+        </Logger>
+        <Logger name="filters" level="debug" additivity="false">
+            <AppenderRef ref="supportinfo" />
+        </Logger>
+        <Root level="error">
+            <AppenderRef ref="supportfatal" />
+        </Root>
+    </Loggers>
+</Configuration>
