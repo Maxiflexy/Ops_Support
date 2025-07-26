@@ -50,6 +50,9 @@ public class AppConstants {
         public static final String VIRTUAL_ACCOUNT_CONFIG_MC = TABLE_SPACE.concat(".virtual_account_config_mc");
         public static final String AIRTIME_TABLE = TABLE_SPACE.concat(".CHL_AIRTIMETOPUP_3");
 
+        public static final String FILE_METADATA = TABLE_SPACE.concat(".SUPPORT_FILE_UPLOAD_MC_V2");
+        public static final String STATUS_ENQUIRY_RECORD = TABLE_SPACE.concat(".STATUS_ENQUIRY_RECORD");
+
         public static final String STANDARD_REVERSAL = TABLE_SPACE.concat(".STANDARD_REVERSAL");
         public static final String EXCEPTIONAL_REVERSAL = TABLE_SPACE.concat(".EXCEPTIONAL_REVERSAL");
         public static final String FUNDS_RECOUP = TABLE_SPACE.concat(".FUNDS_RECOUP");

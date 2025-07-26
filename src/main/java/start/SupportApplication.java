@@ -19,7 +19,6 @@ import services.*;
 import services.fileservlets.*;
 import util.Encrypter;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -173,6 +172,11 @@ public class SupportApplication {
 
             Tomcat.addServlet(context, "FileUpload", new UploadFile());
             context.addServletMappingDecoded(apiContext + "/uploadfile", "FileUpload");
+
+
+            Tomcat.addServlet(context, "FileUploadStatusEnquiry", new UploadFileStatusEnquiry());
+            context.addServletMappingDecoded(apiContext + "/uploadfile-status-enquiry", "FileUploadStatusEnquiry");
+
 
             Tomcat.addServlet(context, "SettlementReportEnquiry", new FetchSettlementReport());
             context.addServletMappingDecoded(apiContext + "/settlement_report/status", "SettlementReportEnquiry");

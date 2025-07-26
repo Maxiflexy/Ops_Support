@@ -1,10 +1,15 @@
 package util;
 
-import javax.mail.*;
+import constants.AppConstants;
+import constants.ModuleName;
+import org.apache.commons.io.IOUtils;
+import persistence.ConnectionUtil;
+
+import javax.mail.Message;
+import javax.mail.Session;
+import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -15,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
-
-import constants.AppConstants;
-import constants.ModuleName;
-import org.apache.commons.io.IOUtils;
-import persistence.ConnectionUtil;
 
 public class EmailNotificationService {
 
@@ -75,6 +75,25 @@ public class EmailNotificationService {
         String filledTemplate = fillTemplate(emailTemplate, currentUser, String.valueOf(moduleName), documentId);
 
         sendEmailWithCC(initiatorEmail, approvedEmails, filledTemplate);
+    }
+
+
+    public void sendUploadNotification(String documentId, String currentUser) throws Exception {
+        //String emailTemplate = loadEmailTemplate(moduleName);
+
+        String initiatorEmail = getInitiatorEmail(currentUser);
+        if (initiatorEmail == null) {
+            throw new Exception("Initiator email not found for user: " + currentUser);
+        }
+
+        List<String> approvedEmails = getApproverEmails();
+        if (approvedEmails.isEmpty()) {
+            throw new Exception("No approves found with ROLE_ID = 3");
+        }
+
+        //String filledTemplate = fillTemplate(emailTemplate, currentUser, String.valueOf(moduleName), documentId);
+
+        //sendEmailWithCC(initiatorEmail, approvedEmails, filledTemplate);
     }
 
     private void sendEmailWithCC(String recipientEmail, List<String> approvedEmails, String filledTemplate) {
