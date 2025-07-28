@@ -4,10 +4,7 @@ import constants.AppConstants;
 import constants.ServiceType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import persistence.ConnectionUtil;
 
@@ -34,13 +31,13 @@ public class StatusEnquiryService {
 
     private StatusEnquiryService() {}
 
-    public void processStatusEnquiryFile(Part filePart, ServiceType serviceType, String documentId, String user) {
-        
-        List<String> sessionIds = new ArrayList<>();
+    public void processStatusEnquiryFile(Part filePart, ServiceType serviceType,
+                                         String documentId, String user) {
+        List<String> referenceIds = new ArrayList<>();
         int recordCount = 0;
 
         try (InputStream fileContent = filePart.getInputStream()) {
-            // Extract session IDs from Excel file
+            // Extract reference IDs from Excel file (Session ID or TOPUP_REF_ID)
             Workbook workbook = new XSSFWorkbook(fileContent);
             Sheet sheet = workbook.getSheetAt(0);
 
@@ -53,9 +50,9 @@ public class StatusEnquiryService {
 
                 Cell cell = row.getCell(0);
                 if (cell != null) {
-                    String sessionId = cell.getStringCellValue().trim();
-                    if (!sessionId.isEmpty()) {
-                        sessionIds.add(sessionId);
+                    String referenceId = cell.getStringCellValue().trim();
+                    if (!referenceId.isEmpty()) {
+                        referenceIds.add(referenceId);
                         recordCount++;
                     }
                 }
@@ -66,7 +63,7 @@ public class StatusEnquiryService {
                     user, recordCount);
 
             // Process and validate records
-            int validatedCount = processAndValidateRecords(sessionIds, serviceType, documentId);
+            int validatedCount = processAndValidateRecords(referenceIds, serviceType, documentId);
 
             // Update validation status
             updateValidationStatus(documentId, validatedCount > 0 ? "true" : "false");
@@ -115,9 +112,9 @@ public class StatusEnquiryService {
         }
     }
 
-    private int processAndValidateRecords(List<String> sessionIds, ServiceType serviceType, String documentId) {
-
-        int batchSize = Math.max(sessionIds.size() / 10, 100);
+    private int processAndValidateRecords(List<String> referenceIds, ServiceType serviceType,
+                                          String documentId) {
+        int batchSize = Math.max(referenceIds.size() / 10, 100);
         int processedCount = 0;
 
         Connection conn = null;
@@ -136,18 +133,18 @@ public class StatusEnquiryService {
 
             int batchCount = 0;
 
-            for (String sessionId : sessionIds) {
-                selectStmt.setString(1, sessionId);
+            for (String referenceId : referenceIds) {
+                selectStmt.setString(1, referenceId);
 
                 try (ResultSet rs = selectStmt.executeQuery()) {
                     if (rs.next()) {
                         // Record found, extract data and prepare for insertion
-                        setInsertParameters(insertStmt, rs, serviceType, documentId, sessionId);
+                        setInsertParameters(insertStmt, rs, serviceType, documentId, referenceId);
                         insertStmt.addBatch();
                         processedCount++;
                     } else {
                         // Record not found, insert with minimal data
-                        setInsertParametersForNotFound(insertStmt, documentId, sessionId);
+                        setInsertParametersForNotFound(insertStmt, documentId, referenceId);
                         insertStmt.addBatch();
                     }
 
@@ -171,7 +168,7 @@ public class StatusEnquiryService {
         } catch (SQLException e) {
             LOG.error("Error processing and validating records", e);
             try {
-                conn.rollback();
+                if (conn != null) conn.rollback();
             } catch (SQLException rollbackEx) {
                 LOG.error("Error during rollback", rollbackEx);
             }
@@ -186,6 +183,10 @@ public class StatusEnquiryService {
 
     private String getSelectQuery(ServiceType serviceType) {
         switch (serviceType) {
+            case AIRTIME:
+                return "SELECT TOPUP_REF_ID, ENTRYDATE, TXNAMT, NARRATION, ACCTNO, SOLID, " +
+                        "CHANNELID, TSQ_RSP_CODE FROM ESBUSER.CHL_AIRTIMETOPUP_3 WHERE TOPUP_REF_ID = ?";
+
             case NIP_INFLOW:
                 return "SELECT SESSIONID, ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, " +
                         "NARRATION, AMOUNT, ACCT_SOL FROM ESBUSER.NIP_IN_FLW_V2 WHERE SESSIONID = ?";
@@ -215,72 +216,106 @@ public class StatusEnquiryService {
                 "FEE_CRNCY_2, FEE_AMT_2, DR_ACCT_NO_2, CR_ACCT_NO_2, FEE_CRNCY_3, FEE_AMT_3, " +
                 "DR_ACCT_NO_3, CR_ACCT_NO_3, FEE_CRNCY_4, FEE_AMT_4, DR_ACCT_NO_4, CR_ACCT_NO_4, " +
                 "FEE_CRNCY_5, FEE_AMT_5, DR_ACCT_NO_5, CR_ACCT_NO_5, ITS_RSP_CODE, DEBIT_RSP_CODE, " +
-                "REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, VALIDATION_STATUS) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, TOPUP_REF_ID, ENTRYDATE, CHANNELID, TSQ_RSP_CODE, VALIDATION_STATUS) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     }
 
     private void setInsertParameters(PreparedStatement stmt, ResultSet rs, ServiceType serviceType,
-                                     String documentId, String sessionId) throws SQLException {
+                                     String documentId, String referenceId) throws SQLException {
 
         stmt.setString(1, documentId);
-        stmt.setString(2, sessionId);
-        stmt.setString(3, rs.getString("ORIGINATORACCOUNTNAME"));
-        stmt.setString(4, rs.getString("ORIGINATORACCOUNTNUMBER"));
-        stmt.setString(5, rs.getString("NARRATION"));
-        stmt.setBigDecimal(6, rs.getBigDecimal("AMOUNT"));
-        stmt.setString(7, rs.getString("ACCT_SOL"));
+        stmt.setString(2, referenceId); // This will be SESSION_ID or TOPUP_REF_ID depending on service type
 
-        if (serviceType == ServiceType.NIP_OUTFLOW || serviceType == ServiceType.UP_OUTFLOW) {
-            // Set fee and response code fields
-            stmt.setString(8, rs.getString("FEECRNCY1"));
-            stmt.setBigDecimal(9, rs.getBigDecimal("FEEAMT1"));
-            stmt.setString(10, rs.getString("DRACCTNO1"));
-            stmt.setString(11, rs.getString("CRACCTNO1"));
-            stmt.setString(12, rs.getString("FEECRNCY2"));
-            stmt.setBigDecimal(13, rs.getBigDecimal("FEEAMT2"));
-            stmt.setString(14, rs.getString("DRACCTNO2"));
-            stmt.setString(15, rs.getString("CRACCTNO2"));
-            stmt.setString(16, rs.getString("FEECRNCY3"));
-            stmt.setBigDecimal(17, rs.getBigDecimal("FEEAMT3"));
-            stmt.setString(18, rs.getString("DRACCTNO3"));
-            stmt.setString(19, rs.getString("CRACCTNO3"));
-            stmt.setString(20, rs.getString("FEECRNCY4"));
-            stmt.setBigDecimal(21, rs.getBigDecimal("FEEAMT4"));
-            stmt.setString(22, rs.getString("DRACCTNO4"));
-            stmt.setString(23, rs.getString("CRACCTNO4"));
-            stmt.setString(24, rs.getString("FEECRNCY5"));
-            stmt.setBigDecimal(25, rs.getBigDecimal("FEEAMT5"));
-            stmt.setString(26, rs.getString("DRACCTNO5"));
-            stmt.setString(27, rs.getString("CRACCTNO5"));
-            stmt.setString(28, rs.getString("ITS_RSP_CODE"));
-            stmt.setString(29, rs.getString("DEBIT_RSP_CODE"));
-            stmt.setString(30, rs.getString("REVERSAL_RSP_CODE"));
-            stmt.setString(31, rs.getString("ITS_TSQ_RSP_CODE"));
-        } else {
-            // Set null values for fee and response code fields for inflow types
+        if (serviceType == ServiceType.AIRTIME) {
+            // For AIRTIME, map fields from CHL_AIRTIMETOPUP_3 table
+            stmt.setString(3, ""); // ORIGINATOR_ACCOUNT_NAME (not available for AIRTIME)
+            stmt.setString(4, rs.getString("ACCTNO")); // ORIGINATOR_ACCOUNT_NUMBER -> ACCTNO
+            stmt.setString(5, rs.getString("NARRATION")); // NARRATION -> NARRATION
+            stmt.setBigDecimal(6, rs.getBigDecimal("TXNAMT")); // AMOUNT -> TXNAMT
+            stmt.setString(7, rs.getString("SOLID")); // ACCT_SOL -> SOLID
+
+            // Set null values for fee fields (not applicable for AIRTIME)
             for (int i = 8; i <= 31; i++) {
-                stmt.setString(i, null);
+                stmt.setString(i, "");
             }
-        }
 
-        stmt.setString(32, "TRUE");
+            // Set AIRTIME-specific fields
+            stmt.setString(32, rs.getString("TOPUP_REF_ID")); // TOPUP_REF_ID
+            stmt.setDate(33, rs.getDate("ENTRYDATE")); // ENTRYDATE
+            stmt.setString(34, rs.getString("CHANNELID")); // CHANNELID
+            stmt.setString(35, rs.getString("TSQ_RSP_CODE")); // TSQ_RSP_CODE
+            stmt.setString(36, "true"); // VALIDATION_STATUS
+
+        } else {
+            // For other service types (NIP/UP INFLOW/OUTFLOW)
+            stmt.setString(3, rs.getString("ORIGINATORACCOUNTNAME"));
+            stmt.setString(4, rs.getString("ORIGINATORACCOUNTNUMBER"));
+            stmt.setString(5, rs.getString("NARRATION"));
+            stmt.setBigDecimal(6, rs.getBigDecimal("AMOUNT"));
+            stmt.setString(7, rs.getString("ACCT_SOL"));
+
+            if (serviceType == ServiceType.NIP_OUTFLOW || serviceType == ServiceType.UP_OUTFLOW) {
+                // Set fee and response code fields
+                stmt.setString(8, rs.getString("FEECRNCY1"));
+                stmt.setBigDecimal(9, rs.getBigDecimal("FEEAMT1"));
+                stmt.setString(10, rs.getString("DRACCTNO1"));
+                stmt.setString(11, rs.getString("CRACCTNO1"));
+                stmt.setString(12, rs.getString("FEECRNCY2"));
+                stmt.setBigDecimal(13, rs.getBigDecimal("FEEAMT2"));
+                stmt.setString(14, rs.getString("DRACCTNO2"));
+                stmt.setString(15, rs.getString("CRACCTNO2"));
+                stmt.setString(16, rs.getString("FEECRNCY3"));
+                stmt.setBigDecimal(17, rs.getBigDecimal("FEEAMT3"));
+                stmt.setString(18, rs.getString("DRACCTNO3"));
+                stmt.setString(19, rs.getString("CRACCTNO3"));
+                stmt.setString(20, rs.getString("FEECRNCY4"));
+                stmt.setBigDecimal(21, rs.getBigDecimal("FEEAMT4"));
+                stmt.setString(22, rs.getString("DRACCTNO4"));
+                stmt.setString(23, rs.getString("CRACCTNO4"));
+                stmt.setString(24, rs.getString("FEECRNCY5"));
+                stmt.setBigDecimal(25, rs.getBigDecimal("FEEAMT5"));
+                stmt.setString(26, rs.getString("DRACCTNO5"));
+                stmt.setString(27, rs.getString("CRACCTNO5"));
+                stmt.setString(28, rs.getString("ITS_RSP_CODE"));
+                stmt.setString(29, rs.getString("DEBIT_RSP_CODE"));
+                stmt.setString(30, rs.getString("REVERSAL_RSP_CODE"));
+                stmt.setString(31, rs.getString("ITS_TSQ_RSP_CODE"));
+            } else {
+                // Set null values for fee and response code fields for inflow types
+                for (int i = 8; i <= 31; i++) {
+                    stmt.setString(i, "");
+                }
+            }
+
+            // Set null values for AIRTIME-specific fields
+            stmt.setString(32, ""); // TOPUP_REF_ID
+            stmt.setDate(33, null); // ENTRYDATE
+            stmt.setString(34, ""); // CHANNELID
+            stmt.setString(35, ""); // TSQ_RSP_CODE
+            stmt.setString(36, "true"); // VALIDATION_STATUS
+        }
     }
 
     private void setInsertParametersForNotFound(PreparedStatement stmt, String documentId,
-                                                String sessionId) throws SQLException {
+                                                String referenceId) throws SQLException {
         stmt.setString(1, documentId);
-        stmt.setString(2, sessionId);
+        stmt.setString(2, referenceId);
 
         // Set null values for all other fields except validation status
-        for (int i = 3; i <= 31; i++) {
-            stmt.setString(i, null);
+        for (int i = 3; i <= 35; i++) {
+            if (i == 33) {
+                // ENTRYDATE is a DATE field, set to null explicitly
+                stmt.setDate(i, null);
+            } else {
+                stmt.setString(i, "");
+            }
         }
 
-        stmt.setString(32, "FALSE");
+        stmt.setString(36, "false"); // VALIDATION_STATUS
     }
 
     private void updateValidationStatus(String documentId, String validationStatus) {
-        String query = "UPDATE " + AppConstants.DbTables.FILE_METADATA + " SET VALIDATION_STATUS = ? WHERE DOCUMENT_ID = ?";
+        String query = "UPDATE ESBUSER.SUPPORT_FILE_UPLOAD_MC_V2 SET VALIDATION_STATUS = ? WHERE DOCUMENT_ID = ?";
 
         Connection conn = null;
         PreparedStatement stmt = null;
@@ -303,8 +338,8 @@ public class StatusEnquiryService {
         }
     }
 
-    public String getFileUploadRecords(int page, int size, String documentId, String serviceType, String creationDate) {
-
+    public String getFileUploadRecords(int page, int size, String documentId,
+                                       String serviceType, String creationDate) {
         StringBuilder queryBuilder = new StringBuilder();
         StringBuilder countQueryBuilder = new StringBuilder();
         List<Object> parameters = new ArrayList<>();

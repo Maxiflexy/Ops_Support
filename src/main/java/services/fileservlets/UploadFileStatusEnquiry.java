@@ -6,7 +6,6 @@ import services.FileValidator;
 import services.StatusEnquiryService;
 import services.servlets.FileServlet;
 import util.CustomUtil;
-import util.EmailNotificationService;
 import util.ResponseUtil;
 
 import javax.servlet.ServletException;
@@ -23,7 +22,6 @@ public class UploadFileStatusEnquiry extends FileServlet {
 
     private final ExecutorService executorService = Executors.newFixedThreadPool(5);
     private final StatusEnquiryService statusEnquiryService = StatusEnquiryService.getInstance();
-    private final EmailNotificationService emailNotificationService = EmailNotificationService.getInstance();
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
@@ -54,7 +52,6 @@ public class UploadFileStatusEnquiry extends FileServlet {
             // Process the file asynchronously
             executorService.submit(() -> {
                 try {
-
                     statusEnquiryService.processStatusEnquiryFile(filePart, serviceType, documentId, user);
 
                     //String userEmail = statusEnquiryService.getUserEmail(user);
@@ -119,26 +116,6 @@ public class UploadFileStatusEnquiry extends FileServlet {
         }
     }
 
-    @Override
-    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-        resp.getWriter().write("{\"status\":\"99\",\"message\":\"PUT method not supported\"}");
-    }
-
-    @Override
-    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-        resp.getWriter().write("{\"status\":\"99\",\"message\":\"DELETE method not supported\"}");
-    }
-
-    @Override
-    public void destroy() {
-        super.destroy();
-        if (!executorService.isShutdown()) {
-            executorService.shutdown();
-        }
-    }
-
     private ServiceType validateServiceTypeForStatusEnquiry(String serviceTypeStr) {
         if (serviceTypeStr == null || serviceTypeStr.trim().isEmpty()) {
             throw new IllegalArgumentException("service_type parameter is required");
@@ -160,6 +137,26 @@ public class UploadFileStatusEnquiry extends FileServlet {
             }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid service_type. Allowed values: AIRTIME, NIP_OUTFLOW, NIP_INFLOW, UP_INFLOW, UP_OUTFLOW");
+        }
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+        resp.getWriter().write("{\"status\":\"99\",\"message\":\"PUT method not supported\"}");
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+        resp.getWriter().write("{\"status\":\"99\",\"message\":\"DELETE method not supported\"}");
+    }
+
+    @Override
+    public void destroy() {
+        super.destroy();
+        if (!executorService.isShutdown()) {
+            executorService.shutdown();
         }
     }
 }
