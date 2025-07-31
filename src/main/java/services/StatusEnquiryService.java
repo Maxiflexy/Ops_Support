@@ -15,6 +15,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class StatusEnquiryService {
@@ -185,11 +186,14 @@ public class StatusEnquiryService {
         switch (serviceType) {
             case AIRTIME:
                 return "SELECT TOPUP_REF_ID, ENTRYDATE, TXNAMT, NARRATION, ACCTNO, SOLID, " +
-                        "CHANNELID, TSQ_RSP_CODE FROM ESBUSER.CHL_AIRTIMETOPUP_3 WHERE TOPUP_REF_ID = ?";
+                        "CHANNELID, TSQ_RSP_CODE, TOPUP_RSP_CODE, TOPUP_RSP_CODE_2, DEBIT_RSP_CODE, " +
+                        "DEBIT_REVERSAL_RSP_CODE, DEBIT_REVERSAL_RSP_FLG " +
+                        "FROM ESBUSER.CHL_AIRTIMETOPUP_3 WHERE TOPUP_REF_ID = ?";
 
             case NIP_INFLOW:
                 return "SELECT SESSIONID, ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, " +
-                        "NARRATION, AMOUNT, ACCT_SOL FROM ESBUSER.NIP_IN_FLW_V2 WHERE SESSIONID = ?";
+                        "NARRATION, AMOUNT, ACCT_SOL, RESPONSECODE, TSQ_2_RSP_CODE, C24_RSP_CODE, C24_RSP_FLG, REQUESTDATE " +
+                        "FROM ESBUSER.NIP_IN_FLW_V2 WHERE SESSIONID = ?";
 
             case NIP_OUTFLOW:
             case UP_OUTFLOW:
@@ -197,12 +201,13 @@ public class StatusEnquiryService {
                         "NARRATION, AMOUNT, ACCT_SOL, FEECRNCY1, FEEAMT1, DRACCTNO1, CRACCTNO1, " +
                         "FEECRNCY2, FEEAMT2, DRACCTNO2, CRACCTNO2, FEECRNCY3, FEEAMT3, DRACCTNO3, CRACCTNO3, " +
                         "FEECRNCY4, FEEAMT4, DRACCTNO4, CRACCTNO4, FEECRNCY5, FEEAMT5, DRACCTNO5, CRACCTNO5, " +
-                        "ITS_RSP_CODE, DEBIT_RSP_CODE, REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE " +
+                        "ITS_RSP_CODE, DEBIT_RSP_CODE, REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, ITS_RSP_FLG, ITS_TSQ_FLG, REVERSAL_FLG, REQUESTDATE " +
                         "FROM ESBUSER.IBT_OUT_FLW WHERE SESSIONID = ?";
 
             case UP_INFLOW:
                 return "SELECT SESSIONID, ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, " +
-                        "NARRATION, AMOUNT, ACCT_SOL FROM ESBUSER.IBT_IN_FLW WHERE SESSIONID = ?";
+                        "NARRATION, AMOUNT, ACCT_SOL, RESPONSECODE, TSQ_2_RSP_CODE, C24_RSP_CODE, REQUESTDATE " +
+                        "FROM ESBUSER.IBT_IN_FLW WHERE SESSIONID = ?";
 
             default:
                 throw new IllegalArgumentException("Unsupported service type: " + serviceType);
@@ -216,8 +221,132 @@ public class StatusEnquiryService {
                 "FEE_CRNCY_2, FEE_AMT_2, DR_ACCT_NO_2, CR_ACCT_NO_2, FEE_CRNCY_3, FEE_AMT_3, " +
                 "DR_ACCT_NO_3, CR_ACCT_NO_3, FEE_CRNCY_4, FEE_AMT_4, DR_ACCT_NO_4, CR_ACCT_NO_4, " +
                 "FEE_CRNCY_5, FEE_AMT_5, DR_ACCT_NO_5, CR_ACCT_NO_5, ITS_RSP_CODE, DEBIT_RSP_CODE, " +
-                "REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, TOPUP_REF_ID, ENTRYDATE, CHANNELID, TSQ_RSP_CODE, VALIDATION_STATUS) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, TOPUP_REF_ID, ENTRYDATE, CHANNELID, TSQ_RSP_CODE, " +
+                "STATUS, REVERSAL_STATUS, ACCOUNT_DEBIT_STATUS, VALIDATION_STATUS) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    }
+
+    private String evaluateTransactionStatus(ResultSet rs, ServiceType serviceType) throws SQLException {
+        switch (serviceType) {
+            case NIP_INFLOW:
+                return evaluateNipInflowStatus(rs);
+            case NIP_OUTFLOW:
+            case UP_OUTFLOW:
+                return evaluateOutflowStatus(rs);
+            case UP_INFLOW:
+                return evaluateUpInflowStatus(rs);
+            case AIRTIME:
+                return evaluateAirtimeStatus(rs);
+            default:
+                return "unknown";
+        }
+    }
+
+    private String evaluateNipInflowStatus(ResultSet rs) throws SQLException {
+        String responseCode = rs.getString("RESPONSECODE");
+        String tsq2RspCode = rs.getString("TSQ_2_RSP_CODE");
+        String c24RspCode = rs.getString("C24_RSP_CODE");
+        String c24RspFlg = rs.getString("C24_RSP_FLG");
+
+        // Success: responsecode = '00' AND tsq_2_rsp_code = '00' and C24_RSP_CODE IN ( '000','913')
+        if ("00".equals(responseCode) && "00".equals(tsq2RspCode) &&
+                (c24RspCode != null && ("000".equals(c24RspCode) || "913".equals(c24RspCode)))) {
+            return "success";
+        }
+
+        // Pending: responsecode = '00' AND tsq_2_rsp_code = '00' AND (C24_RSP_CODE NOT IN ('000','913') OR C24_RSP_FLG = 'N')
+        if ("00".equals(responseCode) && "00".equals(tsq2RspCode) &&
+                ((c24RspCode != null && !("000".equals(c24RspCode) || "913".equals(c24RspCode))) || "N".equals(c24RspFlg))) {
+            return "pending";
+        }
+
+        // Failed: responsecode = '00' AND ((tsq_2_rsp_code <> '00') OR (C24_RSP_CODE NOT IN ('000','913')))
+        if ("00".equals(responseCode) &&
+                (!"00".equals(tsq2RspCode) || (c24RspCode != null && !("000".equals(c24RspCode) || "913".equals(c24RspCode))))) {
+            return "failed";
+        }
+
+        return "unknown";
+    }
+
+    private String evaluateOutflowStatus(ResultSet rs) throws SQLException {
+        String itsRspCode = rs.getString("ITS_RSP_CODE");
+        String itsTsqRspCode = rs.getString("ITS_TSQ_RSP_CODE");
+        String itsRspFlg = rs.getString("ITS_RSP_FLG");
+        String itsTsqFlg = rs.getString("ITS_TSQ_FLG");
+
+        // Success: (its_rsp_code = '00' OR its_tsq_rsp_code = '00')
+        if ("00".equals(itsRspCode) || "00".equals(itsTsqRspCode)) {
+            return "success";
+        }
+
+        // Pending: (its_rsp_code IN ('09', '99', '25', '26', '94', '01') OR its_rsp_flg = 'N') AND (its_tsq_rsp_code IN ('09', '99', '25', '94', '01') OR its_tsq_flg = 'N')
+        boolean rspPending = (itsRspCode != null && Arrays.asList("09", "99", "25", "26", "94", "01").contains(itsRspCode)) || "N".equals(itsRspFlg);
+        boolean tsqPending = (itsTsqRspCode != null && Arrays.asList("09", "99", "25", "94", "01").contains(itsTsqRspCode)) || "N".equals(itsTsqFlg);
+        if (rspPending && tsqPending) {
+            return "pending";
+        }
+
+        // Failed: (its_rsp_code NOT IN ('00','25') OR its_tsq_rsp_code NOT IN ('00', '25') AND its_tsq_flg = 'N')
+        boolean rspFailed = itsRspCode == null || (!("00".equals(itsRspCode) || "25".equals(itsRspCode)));
+        boolean tsqFailed = (itsTsqRspCode == null || (!("00".equals(itsTsqRspCode) || "25".equals(itsTsqRspCode)))) && "N".equals(itsTsqFlg);
+        if (rspFailed || tsqFailed) {
+            return "failed";
+        }
+
+        return "unknown";
+    }
+
+    private String evaluateUpInflowStatus(ResultSet rs) throws SQLException {
+        String responseCode = rs.getString("RESPONSECODE");
+        String tsq2RspCode = rs.getString("TSQ_2_RSP_CODE");
+        String c24RspCode = rs.getString("C24_RSP_CODE");
+
+        // Success: (RESPONSECODE = '00' or TSQ_2_RSP_CODE = '00') and C24_RSP_CODE = '000'
+        if (("00".equals(responseCode) || "00".equals(tsq2RspCode)) && "000".equals(c24RspCode)) {
+            return "success";
+        }
+
+        // Pending: (RESPONSECODE = '05' or TSQ_2_RSP_CODE = '05')
+        if ("05".equals(responseCode) || "05".equals(tsq2RspCode)) {
+            return "pending";
+        }
+
+        // Failed: (RESPONSECODE = '03' or TSQ_2_RSP_CODE = '03')
+        if ("03".equals(responseCode) || "03".equals(tsq2RspCode)) {
+            return "failed";
+        }
+
+        return "unknown";
+    }
+
+    private String evaluateAirtimeStatus(ResultSet rs) throws SQLException {
+        String topupRspCode = rs.getString("TOPUP_RSP_CODE");
+        String topupRspCode2 = rs.getString("TOPUP_RSP_CODE_2");
+        String tsqRspCode = rs.getString("TSQ_RSP_CODE");
+        String debitRspCode = rs.getString("DEBIT_RSP_CODE");
+
+        // Success: (topup_rsp_code = 'SUC' or topup_rsp_code_2 = '00' or tsq_rsp_code = 'SUC') and DEBIT_RSP_CODE in ('000')
+        if (("SUC".equals(topupRspCode) || "00".equals(topupRspCode2) || "SUC".equals(tsqRspCode)) &&
+                "000".equals(debitRspCode)) {
+            return "success";
+        }
+
+        // Pending: (topup_rsp_code = 'UNKW' and tsq_rsp_code in ('UNKW', 'QER')) OR ((topup_rsp_code = 'UNKW' or topup_rsp_code is null) and tsq_rsp_code is null) and DEBIT_RSP_CODE in ('000')
+        boolean pendingCondition1 = "UNKW".equals(topupRspCode) && (tsqRspCode != null && Arrays.asList("UNKW", "QER").contains(tsqRspCode));
+        boolean pendingCondition2 = ("UNKW".equals(topupRspCode) || topupRspCode == null) && tsqRspCode == null;
+        if ((pendingCondition1 || pendingCondition2) && "000".equals(debitRspCode)) {
+            return "pending";
+        }
+
+        // Failed: (topup_rsp_code <> 'SUC' or topup_rsp_code_2 <> '00' or tsq_rsp_code <> 'SUC') and DEBIT_RSP_CODE in ('000')
+        if ((topupRspCode != null && !"SUC".equals(topupRspCode)) ||
+                (topupRspCode2 != null && !"00".equals(topupRspCode2)) ||
+                (tsqRspCode != null && !"SUC".equals(tsqRspCode)) && "000".equals(debitRspCode)) {
+            return "failed";
+        }
+
+        return "unknown";
     }
 
     private void setInsertParameters(PreparedStatement stmt, ResultSet rs, ServiceType serviceType,
@@ -226,13 +355,18 @@ public class StatusEnquiryService {
         stmt.setString(1, documentId);
         stmt.setString(2, referenceId); // This will be SESSION_ID or TOPUP_REF_ID depending on service type
 
+        // Evaluate transaction status
+        String transactionStatus = evaluateTransactionStatus(rs, serviceType);
+        String reversalStatus = evaluateReversalStatus(rs, serviceType);
+        String accountDebitStatus = evaluateAccountDebitStatus(rs, serviceType);
+
         if (serviceType == ServiceType.AIRTIME) {
             // For AIRTIME, map fields from CHL_AIRTIMETOPUP_3 table
             stmt.setString(3, ""); // ORIGINATOR_ACCOUNT_NAME (not available for AIRTIME)
-            stmt.setString(4, rs.getString("ACCTNO")); // ORIGINATOR_ACCOUNT_NUMBER -> ACCTNO
-            stmt.setString(5, rs.getString("NARRATION")); // NARRATION -> NARRATION
-            stmt.setBigDecimal(6, rs.getBigDecimal("TXNAMT")); // AMOUNT -> TXNAMT
-            stmt.setString(7, rs.getString("SOLID")); // ACCT_SOL -> SOLID
+            stmt.setString(4, rs.getString("ACCTNO"));
+            stmt.setString(5, rs.getString("NARRATION"));
+            stmt.setBigDecimal(6, rs.getBigDecimal("TXNAMT"));
+            stmt.setString(7, rs.getString("SOLID"));
 
             // Set null values for fee fields (not applicable for AIRTIME)
             for (int i = 8; i <= 31; i++) {
@@ -240,11 +374,14 @@ public class StatusEnquiryService {
             }
 
             // Set AIRTIME-specific fields
-            stmt.setString(32, rs.getString("TOPUP_REF_ID")); // TOPUP_REF_ID
-            stmt.setDate(33, rs.getDate("ENTRYDATE")); // ENTRYDATE
-            stmt.setString(34, rs.getString("CHANNELID")); // CHANNELID
-            stmt.setString(35, rs.getString("TSQ_RSP_CODE")); // TSQ_RSP_CODE
-            stmt.setString(36, "true"); // VALIDATION_STATUS
+            stmt.setString(32, rs.getString("TOPUP_REF_ID"));
+            stmt.setDate(33, rs.getDate("ENTRYDATE")); // ENTRYDATE for AIRTIME
+            stmt.setString(34, rs.getString("CHANNELID"));
+            stmt.setString(35, rs.getString("TSQ_RSP_CODE"));
+            stmt.setString(36, transactionStatus); // STATUS
+            stmt.setString(37, reversalStatus); // REVERSAL_STATUS
+            stmt.setString(38, accountDebitStatus); // ACCOUNT_DEBIT_STATUS
+            stmt.setString(39, "true"); // VALIDATION_STATUS
 
         } else {
             // For other service types (NIP/UP INFLOW/OUTFLOW)
@@ -289,10 +426,13 @@ public class StatusEnquiryService {
 
             // Set null values for AIRTIME-specific fields
             stmt.setString(32, ""); // TOPUP_REF_ID
-            stmt.setDate(33, null); // ENTRYDATE
+            stmt.setDate(33, rs.getDate("REQUESTDATE")); // REQUESTDATE for NIP/UP services
             stmt.setString(34, ""); // CHANNELID
             stmt.setString(35, ""); // TSQ_RSP_CODE
-            stmt.setString(36, "true"); // VALIDATION_STATUS
+            stmt.setString(36, transactionStatus); // STATUS
+            stmt.setString(37, reversalStatus); // REVERSAL_STATUS
+            stmt.setString(38, accountDebitStatus); // ACCOUNT_DEBIT_STATUS
+            stmt.setString(39, "true"); // VALIDATION_STATUS
         }
     }
 
@@ -301,7 +441,7 @@ public class StatusEnquiryService {
         stmt.setString(1, documentId);
         stmt.setString(2, referenceId);
 
-        // Set null values for all other fields except validation status
+        // Set null values for all other fields except status fields and validation status
         for (int i = 3; i <= 35; i++) {
             if (i == 33) {
                 // ENTRYDATE is a DATE field, set to null explicitly
@@ -311,7 +451,10 @@ public class StatusEnquiryService {
             }
         }
 
-        stmt.setString(36, "false"); // VALIDATION_STATUS
+        stmt.setString(36, "unknown"); // STATUS - unknown for not found records
+        stmt.setString(37, ""); // REVERSAL_STATUS - empty for not found records
+        stmt.setString(38, ""); // ACCOUNT_DEBIT_STATUS - empty for not found records
+        stmt.setString(39, "false"); // VALIDATION_STATUS
     }
 
     private void updateValidationStatus(String documentId, String validationStatus) {
@@ -335,6 +478,78 @@ public class StatusEnquiryService {
             LOG.error("Error updating validation status", e);
         } finally {
             closeResources(conn, stmt, null);
+        }
+    }
+
+    private String evaluateAccountDebitStatus(ResultSet rs, ServiceType serviceType) throws SQLException {
+        switch (serviceType) {
+            case NIP_OUTFLOW:
+            case UP_OUTFLOW:
+                String debitRspCode = rs.getString("DEBIT_RSP_CODE");
+                // Success: DEBIT_RSP_CODE in ('000')
+                if ("000".equals(debitRspCode)) {
+                    return "success";
+                }
+                // Failed: DEBIT_RSP_CODE not in ('000', '913')
+                if (debitRspCode != null && !("000".equals(debitRspCode) || "913".equals(debitRspCode))) {
+                    return "failed";
+                }
+                return "failed";
+
+            case AIRTIME:
+                String airtimeDebitRspCode = rs.getString("DEBIT_RSP_CODE");
+                // Success: DEBIT_RSP_CODE in ('000', '911')
+                if (airtimeDebitRspCode != null && ("000".equals(airtimeDebitRspCode) || "911".equals(airtimeDebitRspCode))) {
+                    return "success";
+                }
+                // Failed: DEBIT_RSP_CODE NOT IN ('000', '911')
+                if (airtimeDebitRspCode != null && !("000".equals(airtimeDebitRspCode) || "911".equals(airtimeDebitRspCode))) {
+                    return "failed";
+                }
+                return "failed";
+
+            case NIP_INFLOW:
+            case UP_INFLOW:
+            default:
+                return ""; // Empty string for service types that don't have these checks
+        }
+    }
+
+    private String evaluateReversalStatus(ResultSet rs, ServiceType serviceType) throws SQLException {
+        switch (serviceType) {
+            case NIP_OUTFLOW:
+            case UP_OUTFLOW:
+                String reversalRspCode = rs.getString("REVERSAL_RSP_CODE");
+                String reversalFlg = rs.getString("REVERSAL_FLG");
+
+                // Success: REVERSAL_RSP_CODE IN ('000','913') and REVERSAL_FLG='Y'
+                if ((reversalRspCode != null && ("000".equals(reversalRspCode) || "913".equals(reversalRspCode))) && "Y".equals(reversalFlg)) {
+                    return "success";
+                }
+                // Failed: REVERSAL_RSP_CODE NOT IN ('000','913') and REVERSAL_FLG='Y'
+                if ((reversalRspCode != null && !("000".equals(reversalRspCode) || "913".equals(reversalRspCode))) && "Y".equals(reversalFlg)) {
+                    return "failed";
+                }
+                return "failed";
+
+            case AIRTIME:
+                String debitReversalRspCode = rs.getString("DEBIT_REVERSAL_RSP_CODE");
+                String debitReversalRspFlg = rs.getString("DEBIT_REVERSAL_RSP_FLG");
+
+                // Success: DEBIT_REVERSAL_RSP_CODE = '000' AND DEBIT_REVERSAL_RSP_FLG='Y'
+                if ("000".equals(debitReversalRspCode) && "Y".equals(debitReversalRspFlg)) {
+                    return "success";
+                }
+                // Failed: DEBIT_REVERSAL_RSP_CODE <> '000' AND DEBIT_REVERSAL_RSP_FLG='Y'
+                if ((debitReversalRspCode != null && !"000".equals(debitReversalRspCode)) && "Y".equals(debitReversalRspFlg)) {
+                    return "failed";
+                }
+                return "failed";
+
+            case NIP_INFLOW:
+            case UP_INFLOW:
+            default:
+                return ""; // Empty string for service types that don't have these checks
         }
     }
 
@@ -472,7 +687,7 @@ public class StatusEnquiryService {
             return null;
         }
 
-        String query = "SELECT EMAIL FROM ESBUSER.BCK_USERS WHERE USERNAME = ?";
+        String query = "SELECT EMAIL FROM ESBUSER.BCK_USERS WHERE USERNAME = ? AND APP_CODE = 'SUPPORT'";
 
         Connection conn = null;
         PreparedStatement stmt = null;
