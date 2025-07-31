@@ -1,15 +1,10 @@
 package util;
 
-import constants.AppConstants;
-import constants.ModuleName;
-import org.apache.commons.io.IOUtils;
-import persistence.ConnectionUtil;
-
-import javax.mail.Message;
-import javax.mail.Session;
-import javax.mail.Transport;
+import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +15,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
+
+import constants.AppConstants;
+import constants.ModuleName;
+import org.apache.commons.io.IOUtils;
+import persistence.ConnectionUtil;
 
 public class EmailNotificationService {
 
@@ -78,23 +78,49 @@ public class EmailNotificationService {
     }
 
 
-    public void sendUploadNotification(String documentId, String currentUser) throws Exception {
-        //String emailTemplate = loadEmailTemplate(moduleName);
+    public void sendUploadNotification(String documentId, String currentUserEmail, String currentUser) throws Exception {
+        String emailTemplate = loadEmailTemplateForStatus();
 
-        String initiatorEmail = getInitiatorEmail(currentUser);
-        if (initiatorEmail == null) {
+        if (currentUserEmail == null) {
             throw new Exception("Initiator email not found for user: " + currentUser);
         }
 
-        List<String> approvedEmails = getApproverEmails();
-        if (approvedEmails.isEmpty()) {
-            throw new Exception("No approves found with ROLE_ID = 3");
-        }
+        String filledTemplate = fillTemplate(emailTemplate, currentUser, documentId);
 
-        //String filledTemplate = fillTemplate(emailTemplate, currentUser, String.valueOf(moduleName), documentId);
-
-        //sendEmailWithCC(initiatorEmail, approvedEmails, filledTemplate);
+        sendEmail(currentUserEmail, filledTemplate);
     }
+
+    private void sendEmail(String recipientEmail, String filledTemplate) {
+
+        try {
+            String emailHost = System.getProperty("email-host");
+            String password = System.getProperty("email-password");
+            String username = System.getProperty("email-from");
+            String port = System.getProperty("email-port");
+
+            Properties props = new Properties();
+            props.put("mail.smtp.host", emailHost);
+            props.put("mail.smtp.port", port);
+            props.put("mail.transport.protocol","smtp");
+
+            Session session = Session.getDefaultInstance(props);
+
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(username));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipientEmail));
+
+            message.setSubject("Document Upload Notification");
+            message.setContent(filledTemplate, "text/html");
+
+            Transport.send(message);
+
+            logger.info("Email sent successfully to " + recipientEmail);
+
+        } catch (Exception e) {
+            logger.severe("Failed to send email to " + recipientEmail + ": " + e.getMessage());
+        }
+    }
+
 
     private void sendEmailWithCC(String recipientEmail, List<String> approvedEmails, String filledTemplate) {
 
@@ -138,6 +164,16 @@ public class EmailNotificationService {
     private String loadEmailTemplate() throws Exception {
         try (InputStream inputStream = getClass().getClassLoader()
                 .getResourceAsStream(AppConstants.EmailTemplates.EMAIL_TEMPLATE_PATH)) {
+            if (inputStream == null) {
+                throw new FileNotFoundException("Template file not found: " + AppConstants.EmailTemplates.EMAIL_TEMPLATE_PATH);
+            }
+            return IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+        }
+    }
+
+    private String loadEmailTemplateForStatus() throws Exception {
+        try (InputStream inputStream = getClass().getClassLoader()
+                .getResourceAsStream(AppConstants.EmailTemplates.EMAIL_TEMPLATE_PATH_STATUS_ENQUIRY)) {
             if (inputStream == null) {
                 throw new FileNotFoundException("Template file not found: " + AppConstants.EmailTemplates.EMAIL_TEMPLATE_PATH);
             }
@@ -199,6 +235,12 @@ public class EmailNotificationService {
                 .replace("${initiator}", initiator)
                 .replace("${module_name}", moduleName)
                 .replace("${document_id}", documentId);
+    }
+
+    private String fillTemplate(String template, String currentUser, String documentId) {
+        return template
+                .replace("${document_id}", documentId)
+                .replace("${uploader_name}", currentUser);
     }
 
 }

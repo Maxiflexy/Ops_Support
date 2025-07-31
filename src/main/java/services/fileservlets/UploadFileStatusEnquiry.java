@@ -6,6 +6,7 @@ import services.FileValidator;
 import services.StatusEnquiryService;
 import services.servlets.FileServlet;
 import util.CustomUtil;
+import util.EmailNotificationService;
 import util.ResponseUtil;
 
 import javax.servlet.ServletException;
@@ -22,6 +23,7 @@ public class UploadFileStatusEnquiry extends FileServlet {
 
     private final ExecutorService executorService = Executors.newFixedThreadPool(5);
     private final StatusEnquiryService statusEnquiryService = StatusEnquiryService.getInstance();
+    private final EmailNotificationService emailNotificationService = EmailNotificationService.getInstance();
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
@@ -54,12 +56,13 @@ public class UploadFileStatusEnquiry extends FileServlet {
                 try {
                     statusEnquiryService.processStatusEnquiryFile(filePart, serviceType, documentId, user);
 
-                    //String userEmail = statusEnquiryService.getUserEmail(user);
-                    // Send notification emails
-//                    emailNotificationService.sendUploadNotification(
-//                            documentId,
-//                            user
-//                    );
+                    String userEmail = statusEnquiryService.getUserEmail(user);
+
+                    emailNotificationService.sendUploadNotification(
+                            documentId,
+                            userEmail,
+                            user
+                    );
                 } catch (Exception e) {
                     LOG.error("Error processing status enquiry file: " + e.getMessage(), e);
                 }

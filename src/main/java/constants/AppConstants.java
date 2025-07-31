@@ -100,6 +100,7 @@ public class AppConstants {
     public static class EmailTemplates {
         public static final String EMAIL_TEMPLATE_PATH = "UPLOAD_FILE_REQUEST.tpl";
         public static final String EMAIL_TEMPLATE_PATH_SETTLEMENT_REPORT = "UPLOAD_FILE_SETTLEMENT_REPORT.tpl";
+        public static final String EMAIL_TEMPLATE_PATH_STATUS_ENQUIRY = "STATUS_UPLOAD.tpl";
     }
 
     public static class ServiceQueries {
