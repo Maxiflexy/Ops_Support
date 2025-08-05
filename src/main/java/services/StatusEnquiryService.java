@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static constants.AppConstants.DbTables.*;
+
 public class StatusEnquiryService {
 
     private static final Logger LOG = LogManager.getLogger(StatusEnquiryService.class);
@@ -127,7 +129,7 @@ public class StatusEnquiryService {
             conn.setAutoCommit(false);
 
             String selectQuery = getSelectQuery(serviceType);
-            String insertQuery = getInsertQuery();
+            String insertQuery = getInsertQuery(serviceType);
 
             selectStmt = conn.prepareStatement(selectQuery);
             insertStmt = conn.prepareStatement(insertQuery);
@@ -145,7 +147,7 @@ public class StatusEnquiryService {
                         processedCount++;
                     } else {
                         // Record not found, insert with minimal data
-                        setInsertParametersForNotFound(insertStmt, documentId, referenceId);
+                        setInsertParametersForNotFound(insertStmt, serviceType, documentId, referenceId);
                         insertStmt.addBatch();
                     }
 
@@ -185,28 +187,49 @@ public class StatusEnquiryService {
     private String getSelectQuery(ServiceType serviceType) {
         switch (serviceType) {
             case AIRTIME:
-                return "SELECT TOPUP_REF_ID, ENTRYDATE, TXNAMT, NARRATION, ACCTNO, SOLID, " +
-                        "CHANNELID, TSQ_RSP_CODE, TOPUP_RSP_CODE, TOPUP_RSP_CODE_2, DEBIT_RSP_CODE, " +
-                        "DEBIT_REVERSAL_RSP_CODE, DEBIT_REVERSAL_RSP_FLG " +
+                return "SELECT MSISDN, ACCTNO, ENTRYDATE, CHANNELID, BILLERID, BILLERNAME, COUNTRYCODE, " +
+                        "ATTRIBUTES, SOLID, TXNAMT, ERRORFLAG, TOPUP_RSP_CODE, TOPUP_RSP_DATE, TOPUP_RSP_FLG, " +
+                        "DEBIT_RSP_CODE, DEBIT_RSP_DATE, DEBIT_RSP_FLG, TOPUP_REF_ID, TOPUP_RSP_TYPE, VENDOR_REF, " +
+                        "TRNPT_RSP_CODE, OPERATOR_REF, TOPUP_RSP_DESC, SERVICE_PROVIDER, TELCO, TXNCRNCY, PRODUCTID, " +
+                        "TOPUP_RSP_CODE_2, TRANID, SOURCEOFFUND, RCHG_TYPE, TSQ_RSP_CODE_2, TSQ_RSP_CODE, " +
+                        "TSQ_RSP_DATE, TSQ_RSP_FLG, TSQ_RSP_TYPE, TSQ_RSP_DESC, TSQ_TRSPT_CODE, " +
+                        "DEBIT_REVERSAL_RSP_CODE, DEBIT_REVERSAL_RSP_DATE, DEBIT_REVERSAL_RSP_FLG, " +
+                        "DEBIT_REVERSAL_TRIAL_COUNT, NARRATION " +
                         "FROM ESBUSER.CHL_AIRTIMETOPUP_3 WHERE TOPUP_REF_ID = ?";
-
-            case NIP_INFLOW:
-                return "SELECT SESSIONID, ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, " +
-                        "NARRATION, AMOUNT, ACCT_SOL, RESPONSECODE, TSQ_2_RSP_CODE, C24_RSP_CODE, C24_RSP_FLG, REQUESTDATE " +
-                        "FROM ESBUSER.NIP_IN_FLW_V2 WHERE SESSIONID = ?";
 
             case NIP_OUTFLOW:
             case UP_OUTFLOW:
-                return "SELECT SESSIONID, ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, " +
-                        "NARRATION, AMOUNT, ACCT_SOL, FEECRNCY1, FEEAMT1, DRACCTNO1, CRACCTNO1, " +
-                        "FEECRNCY2, FEEAMT2, DRACCTNO2, CRACCTNO2, FEECRNCY3, FEEAMT3, DRACCTNO3, CRACCTNO3, " +
-                        "FEECRNCY4, FEEAMT4, DRACCTNO4, CRACCTNO4, FEECRNCY5, FEEAMT5, DRACCTNO5, CRACCTNO5, " +
-                        "ITS_RSP_CODE, DEBIT_RSP_CODE, REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, ITS_RSP_FLG, ITS_TSQ_FLG, REVERSAL_FLG, REQUESTDATE " +
+                return "SELECT TRANID, CLIENTNAME, TRANTYPE, REQUESTDATE, RESPONSEDATE, SESSIONID, " +
+                        "DESTINATIONINSTITUTIONCODE, BENEFICIARYACCOUNTNAME, BENEFICIARYACCOUNTNUMBER, " +
+                        "ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, NARRATION, PAYMENTREFERENCE, AMOUNT, " +
+                        "ACCT_SOL, FEECRNCY1, FEEAMT1, DRACCTNO1, CRACCTNO1, FEECRNCY2, FEEAMT2, DRACCTNO2, " +
+                        "CRACCTNO2, FEECRNCY3, FEEAMT3, DRACCTNO3, CRACCTNO3, FEECRNCY4, FEEAMT4, DRACCTNO4, " +
+                        "CRACCTNO4, FEECRNCY5, FEEAMT5, DRACCTNO5, CRACCTNO5, ITS_RSP_CODE, ITS_RSP_DATE, " +
+                        "ITS_RSP_FLG, DEBIT_RSP_CODE, DEBIT_RSP_DATE, DEBIT_RSP_FLG, CRNCY_CODE, COUNTRY_CODE, " +
+                        "REVERSAL_FLG, REVERSAL_RSP_DATE, REVERSAL_RSP_CODE, TSQ_RETRIAL_ID, ITS_TSQ_FLG, " +
+                        "ITS_TSQ_DATE, ITS_TSQ_RSP_CODE, ITS_TSQ_COUNT, REVERSAL_NUM_TRIAL, DEBIT_NUM_TRIAL, " +
+                        "TSQ_2_FLG, TSQ_2_DATE, TSQ_2_RSP_CODE, TSQ_2_COUNT, SENT, FIN_EXP_SENT, FALLBACK_FLG, " +
+                        "REVERSAL_FALLBACK_FLG, REVERSAL_FALLBACK_DATE, TSQ_FALLBACK_FLG, TSQ_FALLBACK_DATE, " +
+                        "TSQ_2_FALLBACK_FLG, TSQ_2_FALLBACK_DATE, TXN_RETRIAL_COUNT, FSP_TSQ_RSP_CODE " +
                         "FROM ESBUSER.IBT_OUT_FLW WHERE SESSIONID = ?";
 
+            case NIP_INFLOW:
+                return "SELECT CLIENTNAME, TRANTYPE, REQUESTDATE, RESPONSEDATE, SESSIONID, " +
+                        "DESTINATIONINSTITUTIONCODE, CHANNELCODE, RESPONSECODE, NAMEENQUIRYREF, " +
+                        "BENEFICIARYACCOUNTNAME, BENEFICIARYACCOUNTNUMBER, ORIGINATORACCOUNTNAME, " +
+                        "ORIGINATORACCOUNTNUMBER, ORIGINATORKYCLEVEL, NARRATION, PAYMENTREFERENCE, AMOUNT, " +
+                        "DEBITACCOUNTNAME, DEBITACCOUNTNUMBER, DEBITKYCLEVEL, BENEFICIARYKYCLEVEL, ACCT_SOL, " +
+                        "SUBCODE, WS_FINISHED_FLG, TSQ_2_FLG, TSQ_2_DATE, TSQ_2_RSP_CODE, TSQ_2_COUNT, " +
+                        "C24_RSP_CODE, C24_RSP_DATE, C24_RSP_FLG, C24_NUM_TRIAL " +
+                        "FROM ESBUSER.NIP_IN_FLW_V2 WHERE SESSIONID = ?";
+
             case UP_INFLOW:
-                return "SELECT SESSIONID, ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, " +
-                        "NARRATION, AMOUNT, ACCT_SOL, RESPONSECODE, TSQ_2_RSP_CODE, C24_RSP_CODE, REQUESTDATE " +
+                return "SELECT CLIENTNAME, TRANTYPE, REQUESTDATE, RESPONSEDATE, SESSIONID, " +
+                        "DESTINATIONINSTITUTIONCODE, CHANNELCODE, RESPONSECODE, NAMEENQUIRYREF, " +
+                        "BENEFICIARYACCOUNTNAME, BENEFICIARYACCOUNTNUMBER, ORIGINATORACCOUNTNAME, " +
+                        "ORIGINATORACCOUNTNUMBER, ORIGINATORKYCLEVEL, NARRATION, PAYMENTREFERENCE, AMOUNT, " +
+                        "BENEFICIARYKYCLEVEL, ACCT_SOL, SUBCODE, WS_FINISHED_FLG, TSQ_2_FLG, TSQ_2_DATE, " +
+                        "TSQ_2_RSP_CODE, TSQ_2_COUNT, C24_RSP_CODE, C24_RSP_DATE, C24_RSP_FLG, C24_NUM_TRIAL " +
                         "FROM ESBUSER.IBT_IN_FLW WHERE SESSIONID = ?";
 
             default:
@@ -214,16 +237,54 @@ public class StatusEnquiryService {
         }
     }
 
-    private String getInsertQuery() {
-        return "INSERT INTO " + AppConstants.DbTables.STATUS_ENQUIRY_RECORD +
-                " (DOCUMENT_ID, SESSION_ID, ORIGINATOR_ACCOUNT_NAME, ORIGINATOR_ACCOUNT_NUMBER, " +
-                "NARRATION, AMOUNT, ACCT_SOL, FEE_CRNCY_1, FEE_AMT_1, DR_ACCT_NO_1, CR_ACCT_NO_1, " +
-                "FEE_CRNCY_2, FEE_AMT_2, DR_ACCT_NO_2, CR_ACCT_NO_2, FEE_CRNCY_3, FEE_AMT_3, " +
-                "DR_ACCT_NO_3, CR_ACCT_NO_3, FEE_CRNCY_4, FEE_AMT_4, DR_ACCT_NO_4, CR_ACCT_NO_4, " +
-                "FEE_CRNCY_5, FEE_AMT_5, DR_ACCT_NO_5, CR_ACCT_NO_5, ITS_RSP_CODE, DEBIT_RSP_CODE, " +
-                "REVERSAL_RSP_CODE, ITS_TSQ_RSP_CODE, TOPUP_REF_ID, ENTRYDATE, CHANNELID, TSQ_RSP_CODE, " +
-                "STATUS, REVERSAL_STATUS, ACCOUNT_DEBIT_STATUS, VALIDATION_STATUS) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private String getInsertQuery(ServiceType serviceType) {
+        switch (serviceType) {
+            case AIRTIME:
+                return "INSERT INTO " + STATUS_ENQUIRY_RECORD_AIRTIME +
+                        " (DOCUMENT_ID, TOPUP_REF_ID, MSISDN, ACCTNO, ENTRYDATE, CHANNELID, BILLERID, " +
+                        "BILLERNAME, COUNTRYCODE, ATTRIBUTES, SOLID, TXNAMT, ERRORFLAG, TOPUP_RSP_CODE, " +
+                        "TOPUP_RSP_DATE, TOPUP_RSP_FLG, DEBIT_RSP_CODE, DEBIT_RSP_DATE, DEBIT_RSP_FLG, " +
+                        "TOPUP_RSP_TYPE, VENDOR_REF, TRNPT_RSP_CODE, OPERATOR_REF, TOPUP_RSP_DESC, " +
+                        "SERVICE_PROVIDER, TELCO, TXNCRNCY, PRODUCTID, TOPUP_RSP_CODE_2, TRANID, " +
+                        "SOURCEOFFUND, RCHG_TYPE, TSQ_RSP_CODE_2, TSQ_RSP_CODE, TSQ_RSP_DATE, TSQ_RSP_FLG, " +
+                        "TSQ_RSP_TYPE, TSQ_RSP_DESC, TSQ_TRSPT_CODE, DEBIT_REVERSAL_RSP_CODE, " +
+                        "DEBIT_REVERSAL_RSP_DATE, DEBIT_REVERSAL_RSP_FLG, DEBIT_REVERSAL_TRIAL_COUNT, " +
+                        "NARRATION, TRANSACTION_STATUS, REVERSAL_STATUS, ACCOUNT_DEBIT_STATUS, VALIDATION_STATUS) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+            case NIP_OUTFLOW:
+            case UP_OUTFLOW:
+                return "INSERT INTO " + STATUS_ENQUIRY_RECORD_OUTFLOW +
+                        " (DOCUMENT_ID, SESSIONID, TRANID, CLIENTNAME, TRANTYPE, REQUESTDATE, RESPONSEDATE, " +
+                        "DESTINATIONINSTITUTIONCODE, BENEFICIARYACCOUNTNAME, BENEFICIARYACCOUNTNUMBER, " +
+                        "ORIGINATORACCOUNTNAME, ORIGINATORACCOUNTNUMBER, NARRATION, PAYMENTREFERENCE, AMOUNT, " +
+                        "ACCT_SOL, FEECRNCY1, FEEAMT1, DRACCTNO1, CRACCTNO1, FEECRNCY2, FEEAMT2, DRACCTNO2, " +
+                        "CRACCTNO2, FEECRNCY3, FEEAMT3, DRACCTNO3, CRACCTNO3, FEECRNCY4, FEEAMT4, DRACCTNO4, " +
+                        "CRACCTNO4, FEECRNCY5, FEEAMT5, DRACCTNO5, CRACCTNO5, ITS_RSP_CODE, ITS_RSP_DATE, " +
+                        "ITS_RSP_FLG, DEBIT_RSP_CODE, DEBIT_RSP_DATE, DEBIT_RSP_FLG, CRNCY_CODE, COUNTRY_CODE, " +
+                        "REVERSAL_FLG, REVERSAL_RSP_DATE, REVERSAL_RSP_CODE, TSQ_RETRIAL_ID, ITS_TSQ_FLG, " +
+                        "ITS_TSQ_DATE, ITS_TSQ_RSP_CODE, ITS_TSQ_COUNT, REVERSAL_NUM_TRIAL, DEBIT_NUM_TRIAL, " +
+                        "TSQ_2_FLG, TSQ_2_DATE, TSQ_2_RSP_CODE, TSQ_2_COUNT, SENT, FIN_EXP_SENT, FALLBACK_FLG, " +
+                        "REVERSAL_FALLBACK_FLG, REVERSAL_FALLBACK_DATE, TSQ_FALLBACK_FLG, TSQ_FALLBACK_DATE, " +
+                        "TSQ_2_FALLBACK_FLG, TSQ_2_FALLBACK_DATE, TXN_RETRIAL_COUNT, FSP_TSQ_RSP_CODE, " +
+                        "TRANSACTION_STATUS, REVERSAL_STATUS, ACCOUNT_DEBIT_STATUS, VALIDATION_STATUS) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+            case NIP_INFLOW:
+            case UP_INFLOW:
+                return "INSERT INTO " + STATUS_ENQUIRY_RECORD_INFLOW +
+                        " (DOCUMENT_ID, SESSIONID, CLIENTNAME, TRANTYPE, REQUESTDATE, RESPONSEDATE, " +
+                        "DESTINATIONINSTITUTIONCODE, CHANNELCODE, RESPONSECODE, NAMEENQUIRYREF, " +
+                        "BENEFICIARYACCOUNTNAME, BENEFICIARYACCOUNTNUMBER, ORIGINATORACCOUNTNAME, " +
+                        "ORIGINATORACCOUNTNUMBER, ORIGINATORKYCLEVEL, NARRATION, PAYMENTREFERENCE, AMOUNT, " +
+                        "DEBITACCOUNTNAME, DEBITACCOUNTNUMBER, DEBITKYCLEVEL, BENEFICIARYKYCLEVEL, ACCT_SOL, " +
+                        "SUBCODE, WS_FINISHED_FLG, TSQ_2_FLG, TSQ_2_DATE, TSQ_2_RSP_CODE, TSQ_2_COUNT, " +
+                        "C24_RSP_CODE, C24_RSP_DATE, C24_RSP_FLG, C24_NUM_TRIAL, TRANSACTION_STATUS, VALIDATION_STATUS) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+            default:
+                throw new IllegalArgumentException("Unsupported service type: " + serviceType);
+        }
     }
 
     private String evaluateTransactionStatus(ResultSet rs, ServiceType serviceType) throws SQLException {
@@ -357,104 +418,270 @@ public class StatusEnquiryService {
 
         // Evaluate transaction status
         String transactionStatus = evaluateTransactionStatus(rs, serviceType);
-        String reversalStatus = evaluateReversalStatus(rs, serviceType);
-        String accountDebitStatus = evaluateAccountDebitStatus(rs, serviceType);
 
         if (serviceType == ServiceType.AIRTIME) {
-            // For AIRTIME, map fields from CHL_AIRTIMETOPUP_3 table
-            stmt.setString(3, ""); // ORIGINATOR_ACCOUNT_NAME (not available for AIRTIME)
+            // Map AIRTIME specific fields
+            stmt.setString(3, rs.getString("MSISDN"));
             stmt.setString(4, rs.getString("ACCTNO"));
-            stmt.setString(5, rs.getString("NARRATION"));
-            stmt.setBigDecimal(6, rs.getBigDecimal("TXNAMT"));
-            stmt.setString(7, rs.getString("SOLID"));
+            stmt.setDate(5, rs.getDate("ENTRYDATE"));
+            stmt.setString(6, rs.getString("CHANNELID"));
+            stmt.setString(7, rs.getString("BILLERID"));
+            stmt.setString(8, rs.getString("BILLERNAME"));
+            stmt.setString(9, rs.getString("COUNTRYCODE"));
+            stmt.setString(10, rs.getString("ATTRIBUTES"));
+            stmt.setString(11, rs.getString("SOLID"));
+            stmt.setBigDecimal(12, rs.getBigDecimal("TXNAMT"));
+            stmt.setString(13, rs.getString("ERRORFLAG"));
+            stmt.setString(14, rs.getString("TOPUP_RSP_CODE"));
+            stmt.setDate(15, rs.getDate("TOPUP_RSP_DATE"));
+            stmt.setString(16, rs.getString("TOPUP_RSP_FLG"));
+            stmt.setString(17, rs.getString("DEBIT_RSP_CODE"));
+            stmt.setDate(18, rs.getDate("DEBIT_RSP_DATE"));
+            stmt.setString(19, rs.getString("DEBIT_RSP_FLG"));
+            stmt.setString(20, rs.getString("TOPUP_RSP_TYPE"));
+            stmt.setString(21, rs.getString("VENDOR_REF"));
+            stmt.setString(22, rs.getString("TRNPT_RSP_CODE"));
+            stmt.setString(23, rs.getString("OPERATOR_REF"));
+            stmt.setString(24, rs.getString("TOPUP_RSP_DESC"));
+            stmt.setString(25, rs.getString("SERVICE_PROVIDER"));
+            stmt.setString(26, rs.getString("TELCO"));
+            stmt.setString(27, rs.getString("TXNCRNCY"));
+            stmt.setString(28, rs.getString("PRODUCTID"));
+            stmt.setString(29, rs.getString("TOPUP_RSP_CODE_2"));
+            stmt.setString(30, rs.getString("TRANID"));
+            stmt.setString(31, rs.getString("SOURCEOFFUND"));
+            stmt.setString(32, rs.getString("RCHG_TYPE"));
+            stmt.setString(33, rs.getString("TSQ_RSP_CODE_2"));
+            stmt.setString(34, rs.getString("TSQ_RSP_CODE"));
+            stmt.setDate(35, rs.getDate("TSQ_RSP_DATE"));
+            stmt.setString(36, rs.getString("TSQ_RSP_FLG"));
+            stmt.setString(37, rs.getString("TSQ_RSP_TYPE"));
+            stmt.setString(38, rs.getString("TSQ_RSP_DESC"));
+            stmt.setString(39, rs.getString("TSQ_TRSPT_CODE"));
+            stmt.setString(40, rs.getString("DEBIT_REVERSAL_RSP_CODE"));
+            stmt.setDate(41, rs.getDate("DEBIT_REVERSAL_RSP_DATE"));
+            stmt.setString(42, rs.getString("DEBIT_REVERSAL_RSP_FLG"));
 
-            // Set null values for fee fields (not applicable for AIRTIME)
-            for (int i = 8; i <= 31; i++) {
-                stmt.setString(i, "");
-            }
-
-            // Set AIRTIME-specific fields
-            stmt.setString(32, rs.getString("TOPUP_REF_ID"));
-            stmt.setDate(33, rs.getDate("ENTRYDATE")); // ENTRYDATE for AIRTIME
-            stmt.setString(34, rs.getString("CHANNELID"));
-            stmt.setString(35, rs.getString("TSQ_RSP_CODE"));
-            stmt.setString(36, transactionStatus); // STATUS
-            stmt.setString(37, reversalStatus); // REVERSAL_STATUS
-            stmt.setString(38, accountDebitStatus); // ACCOUNT_DEBIT_STATUS
-            stmt.setString(39, "true"); // VALIDATION_STATUS
-
-        } else {
-            // For other service types (NIP/UP INFLOW/OUTFLOW)
-            stmt.setString(3, rs.getString("ORIGINATORACCOUNTNAME"));
-            stmt.setString(4, rs.getString("ORIGINATORACCOUNTNUMBER"));
-            stmt.setString(5, rs.getString("NARRATION"));
-            stmt.setBigDecimal(6, rs.getBigDecimal("AMOUNT"));
-            stmt.setString(7, rs.getString("ACCT_SOL"));
-
-            if (serviceType == ServiceType.NIP_OUTFLOW || serviceType == ServiceType.UP_OUTFLOW) {
-                // Set fee and response code fields
-                stmt.setString(8, rs.getString("FEECRNCY1"));
-                stmt.setBigDecimal(9, rs.getBigDecimal("FEEAMT1"));
-                stmt.setString(10, rs.getString("DRACCTNO1"));
-                stmt.setString(11, rs.getString("CRACCTNO1"));
-                stmt.setString(12, rs.getString("FEECRNCY2"));
-                stmt.setBigDecimal(13, rs.getBigDecimal("FEEAMT2"));
-                stmt.setString(14, rs.getString("DRACCTNO2"));
-                stmt.setString(15, rs.getString("CRACCTNO2"));
-                stmt.setString(16, rs.getString("FEECRNCY3"));
-                stmt.setBigDecimal(17, rs.getBigDecimal("FEEAMT3"));
-                stmt.setString(18, rs.getString("DRACCTNO3"));
-                stmt.setString(19, rs.getString("CRACCTNO3"));
-                stmt.setString(20, rs.getString("FEECRNCY4"));
-                stmt.setBigDecimal(21, rs.getBigDecimal("FEEAMT4"));
-                stmt.setString(22, rs.getString("DRACCTNO4"));
-                stmt.setString(23, rs.getString("CRACCTNO4"));
-                stmt.setString(24, rs.getString("FEECRNCY5"));
-                stmt.setBigDecimal(25, rs.getBigDecimal("FEEAMT5"));
-                stmt.setString(26, rs.getString("DRACCTNO5"));
-                stmt.setString(27, rs.getString("CRACCTNO5"));
-                stmt.setString(28, rs.getString("ITS_RSP_CODE"));
-                stmt.setString(29, rs.getString("DEBIT_RSP_CODE"));
-                stmt.setString(30, rs.getString("REVERSAL_RSP_CODE"));
-                stmt.setString(31, rs.getString("ITS_TSQ_RSP_CODE"));
+            // Handle potential null for DEBIT_REVERSAL_TRIAL_COUNT
+            Object trialCount = rs.getObject("DEBIT_REVERSAL_TRIAL_COUNT");
+            if (trialCount != null) {
+                stmt.setInt(43, ((Number) trialCount).intValue());
             } else {
-                // Set null values for fee and response code fields for inflow types
-                for (int i = 8; i <= 31; i++) {
-                    stmt.setString(i, "");
-                }
+                stmt.setNull(43, java.sql.Types.INTEGER);
             }
 
-            // Set null values for AIRTIME-specific fields
-            stmt.setString(32, ""); // TOPUP_REF_ID
-            stmt.setDate(33, rs.getDate("REQUESTDATE")); // REQUESTDATE for NIP/UP services
-            stmt.setString(34, ""); // CHANNELID
-            stmt.setString(35, ""); // TSQ_RSP_CODE
-            stmt.setString(36, transactionStatus); // STATUS
-            stmt.setString(37, reversalStatus); // REVERSAL_STATUS
-            stmt.setString(38, accountDebitStatus); // ACCOUNT_DEBIT_STATUS
-            stmt.setString(39, "true"); // VALIDATION_STATUS
+            stmt.setString(44, rs.getString("NARRATION"));
+            stmt.setString(45, transactionStatus);
+            stmt.setString(46, evaluateReversalStatus(rs, serviceType));
+            stmt.setString(47, evaluateAccountDebitStatus(rs, serviceType));
+            stmt.setString(48, "true");
+
+        } else if (serviceType == ServiceType.NIP_OUTFLOW || serviceType == ServiceType.UP_OUTFLOW) {
+            // Map OUTFLOW specific fields
+
+            // Handle potential null for TRANID
+            Object tranId = rs.getObject("TRANID");
+            if (tranId != null) {
+                stmt.setLong(3, ((Number) tranId).longValue());
+            } else {
+                stmt.setNull(3, java.sql.Types.NUMERIC);
+            }
+
+            stmt.setString(4, rs.getString("CLIENTNAME"));
+            stmt.setString(5, rs.getString("TRANTYPE"));
+            stmt.setDate(6, rs.getDate("REQUESTDATE"));
+            stmt.setDate(7, rs.getDate("RESPONSEDATE"));
+            stmt.setString(8, rs.getString("DESTINATIONINSTITUTIONCODE"));
+            stmt.setString(9, rs.getString("BENEFICIARYACCOUNTNAME"));
+            stmt.setString(10, rs.getString("BENEFICIARYACCOUNTNUMBER"));
+            stmt.setString(11, rs.getString("ORIGINATORACCOUNTNAME"));
+            stmt.setString(12, rs.getString("ORIGINATORACCOUNTNUMBER"));
+            stmt.setString(13, rs.getString("NARRATION"));
+            stmt.setString(14, rs.getString("PAYMENTREFERENCE"));
+            stmt.setBigDecimal(15, rs.getBigDecimal("AMOUNT"));
+            stmt.setString(16, rs.getString("ACCT_SOL"));
+
+            // Fee fields
+            stmt.setString(17, rs.getString("FEECRNCY1"));
+            stmt.setBigDecimal(18, rs.getBigDecimal("FEEAMT1"));
+            stmt.setString(19, rs.getString("DRACCTNO1"));
+            stmt.setString(20, rs.getString("CRACCTNO1"));
+            stmt.setString(21, rs.getString("FEECRNCY2"));
+            stmt.setBigDecimal(22, rs.getBigDecimal("FEEAMT2"));
+            stmt.setString(23, rs.getString("DRACCTNO2"));
+            stmt.setString(24, rs.getString("CRACCTNO2"));
+            stmt.setString(25, rs.getString("FEECRNCY3"));
+            stmt.setBigDecimal(26, rs.getBigDecimal("FEEAMT3"));
+            stmt.setString(27, rs.getString("DRACCTNO3"));
+            stmt.setString(28, rs.getString("CRACCTNO3"));
+            stmt.setString(29, rs.getString("FEECRNCY4"));
+            stmt.setBigDecimal(30, rs.getBigDecimal("FEEAMT4"));
+            stmt.setString(31, rs.getString("DRACCTNO4"));
+            stmt.setString(32, rs.getString("CRACCTNO4"));
+            stmt.setString(33, rs.getString("FEECRNCY5"));
+            stmt.setBigDecimal(34, rs.getBigDecimal("FEEAMT5"));
+            stmt.setString(35, rs.getString("DRACCTNO5"));
+            stmt.setString(36, rs.getString("CRACCTNO5"));
+
+            // Response code fields
+            stmt.setString(37, rs.getString("ITS_RSP_CODE"));
+            stmt.setDate(38, rs.getDate("ITS_RSP_DATE"));
+            stmt.setString(39, rs.getString("ITS_RSP_FLG"));
+            stmt.setString(40, rs.getString("DEBIT_RSP_CODE"));
+            stmt.setDate(41, rs.getDate("DEBIT_RSP_DATE"));
+            stmt.setString(42, rs.getString("DEBIT_RSP_FLG"));
+            stmt.setString(43, rs.getString("CRNCY_CODE"));
+            stmt.setString(44, rs.getString("COUNTRY_CODE"));
+            stmt.setString(45, rs.getString("REVERSAL_FLG"));
+            stmt.setDate(46, rs.getDate("REVERSAL_RSP_DATE"));
+            stmt.setString(47, rs.getString("REVERSAL_RSP_CODE"));
+            stmt.setString(48, rs.getString("TSQ_RETRIAL_ID"));
+            stmt.setString(49, rs.getString("ITS_TSQ_FLG"));
+            stmt.setDate(50, rs.getDate("ITS_TSQ_DATE"));
+            stmt.setString(51, rs.getString("ITS_TSQ_RSP_CODE"));
+
+            // Handle numeric fields that might be null
+            setIntegerOrNull(stmt, 52, rs, "ITS_TSQ_COUNT");
+            setIntegerOrNull(stmt, 53, rs, "REVERSAL_NUM_TRIAL");
+            setIntegerOrNull(stmt, 54, rs, "DEBIT_NUM_TRIAL");
+
+            stmt.setString(55, rs.getString("TSQ_2_FLG"));
+            stmt.setDate(56, rs.getDate("TSQ_2_DATE"));
+            stmt.setString(57, rs.getString("TSQ_2_RSP_CODE"));
+            setIntegerOrNull(stmt, 58, rs, "TSQ_2_COUNT");
+
+            stmt.setString(59, rs.getString("SENT"));
+            stmt.setString(60, rs.getString("FIN_EXP_SENT"));
+            stmt.setString(61, rs.getString("FALLBACK_FLG"));
+            stmt.setString(62, rs.getString("REVERSAL_FALLBACK_FLG"));
+            stmt.setDate(63, rs.getDate("REVERSAL_FALLBACK_DATE"));
+            stmt.setString(64, rs.getString("TSQ_FALLBACK_FLG"));
+            stmt.setDate(65, rs.getDate("TSQ_FALLBACK_DATE"));
+            stmt.setString(66, rs.getString("TSQ_2_FALLBACK_FLG"));
+            stmt.setDate(67, rs.getDate("TSQ_2_FALLBACK_DATE"));
+            setIntegerOrNull(stmt, 68, rs, "TXN_RETRIAL_COUNT");
+
+            stmt.setString(69, rs.getString("FSP_TSQ_RSP_CODE"));
+            stmt.setString(70, transactionStatus);
+            stmt.setString(71, evaluateReversalStatus(rs, serviceType));
+            stmt.setString(72, evaluateAccountDebitStatus(rs, serviceType));
+            stmt.setString(73, "true");
+
+        } else if (serviceType == ServiceType.NIP_INFLOW || serviceType == ServiceType.UP_INFLOW) {
+            // Map INFLOW specific fields
+            stmt.setString(3, rs.getString("CLIENTNAME"));
+            stmt.setString(4, rs.getString("TRANTYPE"));
+            stmt.setDate(5, rs.getDate("REQUESTDATE"));
+            stmt.setDate(6, rs.getDate("RESPONSEDATE"));
+            stmt.setString(7, rs.getString("DESTINATIONINSTITUTIONCODE"));
+            stmt.setString(8, rs.getString("CHANNELCODE"));
+            stmt.setString(9, rs.getString("RESPONSECODE"));
+            stmt.setString(10, rs.getString("NAMEENQUIRYREF"));
+            stmt.setString(11, rs.getString("BENEFICIARYACCOUNTNAME"));
+            stmt.setString(12, rs.getString("BENEFICIARYACCOUNTNUMBER"));
+            stmt.setString(13, rs.getString("ORIGINATORACCOUNTNAME"));
+            stmt.setString(14, rs.getString("ORIGINATORACCOUNTNUMBER"));
+            stmt.setString(15, rs.getString("ORIGINATORKYCLEVEL"));
+            stmt.setString(16, rs.getString("NARRATION"));
+            stmt.setString(17, rs.getString("PAYMENTREFERENCE"));
+            stmt.setBigDecimal(18, rs.getBigDecimal("AMOUNT"));
+
+            // Handle debit account fields - only available for NIP_INFLOW
+            if (serviceType == ServiceType.NIP_INFLOW) {
+                stmt.setString(19, rs.getString("DEBITACCOUNTNAME"));
+                stmt.setString(20, rs.getString("DEBITACCOUNTNUMBER"));
+                stmt.setString(21, rs.getString("DEBITKYCLEVEL"));
+            } else {
+                // UP_INFLOW - set empty strings for missing debit fields
+                stmt.setString(19, "");
+                stmt.setString(20, "");
+                stmt.setString(21, "");
+            }
+
+            stmt.setString(22, rs.getString("BENEFICIARYKYCLEVEL"));
+            stmt.setString(23, rs.getString("ACCT_SOL"));
+            stmt.setString(24, rs.getString("SUBCODE"));
+            stmt.setString(25, rs.getString("WS_FINISHED_FLG"));
+            stmt.setString(26, rs.getString("TSQ_2_FLG"));
+            stmt.setDate(27, rs.getDate("TSQ_2_DATE"));
+            stmt.setString(28, rs.getString("TSQ_2_RSP_CODE"));
+            setIntegerOrNull(stmt, 29, rs, "TSQ_2_COUNT");
+            stmt.setString(30, rs.getString("C24_RSP_CODE"));
+            stmt.setDate(31, rs.getDate("C24_RSP_DATE"));
+            stmt.setString(32, rs.getString("C24_RSP_FLG"));
+            setIntegerOrNull(stmt, 33, rs, "C24_NUM_TRIAL");
+            stmt.setString(34, transactionStatus);
+            stmt.setString(35, "true");
         }
     }
 
-    private void setInsertParametersForNotFound(PreparedStatement stmt, String documentId,
-                                                String referenceId) throws SQLException {
+    private void setIntegerOrNull(PreparedStatement stmt, int paramIndex, ResultSet rs, String columnName) throws SQLException {
+        Object value = rs.getObject(columnName);
+        if (value != null) {
+            stmt.setInt(paramIndex, ((Number) value).intValue());
+        } else {
+            stmt.setNull(paramIndex, java.sql.Types.INTEGER);
+        }
+    }
+
+    private void setInsertParametersForNotFound(PreparedStatement stmt, ServiceType serviceType,
+                                                String documentId, String referenceId) throws SQLException {
         stmt.setString(1, documentId);
         stmt.setString(2, referenceId);
 
-        // Set null values for all other fields except status fields and validation status
-        for (int i = 3; i <= 35; i++) {
-            if (i == 33) {
-                // ENTRYDATE is a DATE field, set to null explicitly
-                stmt.setDate(i, null);
-            } else {
-                stmt.setString(i, "");
+        if (serviceType == ServiceType.AIRTIME) {
+            // Set null/empty values for all AIRTIME fields except status fields
+            for (int i = 3; i <= 44; i++) {
+                if (i == 5 || i == 15 || i == 18 || i == 35 || i == 41) { // DATE fields
+                    stmt.setDate(i, null);
+                } else if (i == 12) { // TXNAMT - numeric field
+                    stmt.setNull(i, java.sql.Types.NUMERIC);
+                } else if (i == 43) { // DEBIT_REVERSAL_TRIAL_COUNT - integer field
+                    stmt.setNull(i, java.sql.Types.INTEGER);
+                } else {
+                    stmt.setString(i, "");
+                }
             }
-        }
+            stmt.setString(45, "unknown"); // TRANSACTION_STATUS
+            stmt.setString(46, ""); // REVERSAL_STATUS
+            stmt.setString(47, ""); // ACCOUNT_DEBIT_STATUS
+            stmt.setString(48, "false"); // VALIDATION_STATUS
 
-        stmt.setString(36, "unknown"); // STATUS - unknown for not found records
-        stmt.setString(37, ""); // REVERSAL_STATUS - empty for not found records
-        stmt.setString(38, ""); // ACCOUNT_DEBIT_STATUS - empty for not found records
-        stmt.setString(39, "false"); // VALIDATION_STATUS
+        } else if (serviceType == ServiceType.NIP_OUTFLOW || serviceType == ServiceType.UP_OUTFLOW) {
+            // Set null/empty values for all OUTFLOW fields except status fields
+            stmt.setNull(3, java.sql.Types.NUMERIC); // TRANID
+            for (int i = 4; i <= 69; i++) {
+                if (i == 6 || i == 7 || i == 38 || i == 41 || i == 46 || i == 50 || i == 56 || i == 63 || i == 65 || i == 67) { // DATE fields
+                    stmt.setDate(i, null);
+                } else if (i == 15 || i == 18 || i == 22 || i == 26 || i == 30 || i == 34) { // NUMERIC/DECIMAL fields
+                    stmt.setNull(i, java.sql.Types.NUMERIC);
+                } else if (i == 52 || i == 53 || i == 54 || i == 58 || i == 68) { // INTEGER fields
+                    stmt.setNull(i, java.sql.Types.INTEGER);
+                } else {
+                    stmt.setString(i, "");
+                }
+            }
+            stmt.setString(70, "unknown"); // TRANSACTION_STATUS
+            stmt.setString(71, ""); // REVERSAL_STATUS
+            stmt.setString(72, ""); // ACCOUNT_DEBIT_STATUS
+            stmt.setString(73, "false"); // VALIDATION_STATUS
+
+        } else if (serviceType == ServiceType.NIP_INFLOW || serviceType == ServiceType.UP_INFLOW) {
+            // Set null/empty values for all INFLOW fields except status fields
+            for (int i = 3; i <= 33; i++) {
+                if (i == 5 || i == 6 || i == 27 || i == 31) { // DATE fields
+                    stmt.setDate(i, null);
+                } else if (i == 18) { // AMOUNT - numeric field
+                    stmt.setNull(i, java.sql.Types.NUMERIC);
+                } else if (i == 29 || i == 33) { // INTEGER fields
+                    stmt.setNull(i, java.sql.Types.INTEGER);
+                } else {
+                    stmt.setString(i, "");
+                }
+            }
+            stmt.setString(34, "unknown"); // TRANSACTION_STATUS
+            stmt.setString(35, "false"); // VALIDATION_STATUS
+        }
     }
 
     private void updateValidationStatus(String documentId, String validationStatus) {

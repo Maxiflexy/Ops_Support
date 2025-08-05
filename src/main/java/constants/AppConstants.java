@@ -53,6 +53,10 @@ public class AppConstants {
         public static final String FILE_METADATA = TABLE_SPACE.concat(".SUPPORT_FILE_UPLOAD_MC_V2");
         public static final String STATUS_ENQUIRY_RECORD = TABLE_SPACE.concat(".STATUS_ENQUIRY_RECORD");
 
+        public static final String STATUS_ENQUIRY_RECORD_AIRTIME = TABLE_SPACE.concat(".STATUS_ENQUIRY_RECORD_AIRTIME");
+        public static final String STATUS_ENQUIRY_RECORD_OUTFLOW = TABLE_SPACE.concat(".STATUS_ENQUIRY_RECORD_OUTFLOW");
+        public static final String STATUS_ENQUIRY_RECORD_INFLOW = TABLE_SPACE.concat(".STATUS_ENQUIRY_RECORD_INFLOW");
+
         public static final String STANDARD_REVERSAL = TABLE_SPACE.concat(".STANDARD_REVERSAL");
         public static final String EXCEPTIONAL_REVERSAL = TABLE_SPACE.concat(".EXCEPTIONAL_REVERSAL");
         public static final String FUNDS_RECOUP = TABLE_SPACE.concat(".FUNDS_RECOUP");
@@ -141,8 +145,6 @@ public class AppConstants {
         public static final String AIRTIME_ACCOUNT_DEBIT_FAILED = " DEBIT_RSP_CODE NOT IN ('000', '911')";
         public static final String AIRTIME_REVERSAL_SUCCESS = "DEBIT_REVERSAL_RSP_CODE = '000' AND DEBIT_REVERSAL_RSP_FLG='Y'";
         public static final String AIRTIME_REVERSAL_FAILED = "DEBIT_REVERSAL_RSP_CODE <> '000' AND DEBIT_REVERSAL_RSP_FLG='Y'";
-
-
 
     }
 }
